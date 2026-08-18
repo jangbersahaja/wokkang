@@ -1,0 +1,15 @@
+{
+  "folders": [
+    {
+      "name": "Main App (Gembira Momento)",
+      "path": "../gembira-momento",
+    },
+    {
+      "name": "Monitor App (StoreHub)",
+      "path": ".",
+    },
+  ],
+  "settings": {
+    "typescript.tsdk": "node_modules/typescript/lib",
+  },
+}
