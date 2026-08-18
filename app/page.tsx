@@ -53,6 +53,8 @@ interface ProductSales {
   discount: number;
   netSales: number;
   transactionCount: number;
+  cost: number;
+  totalCost: number;
 }
 
 type DateFilter = "today" | "yesterday" | "week" | "month" | "custom";
@@ -320,10 +322,28 @@ export default function LiveMonitorPage() {
         // Calculate product sales
         const productMap = new Map<string, ProductSales>();
 
+        // Fetch products to get cost data
+        let productCostMap = new Map<string, number>();
+        try {
+          const productsResponse = await fetch("/api/products");
+          if (productsResponse.ok) {
+            const productsData = await productsResponse.json();
+            if (productsData.success && productsData.data) {
+              productsData.data.forEach((product: any) => {
+                productCostMap.set(product.sku, product.cost || 0);
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch product costs:", error);
+        }
+
         completed.forEach((t: Transaction) => {
           t.items.forEach((item) => {
             const key = `${item.sku || "unknown"}-${item.productName}`;
             const existing = productMap.get(key);
+            const itemSku = item.sku || "N/A";
+            const unitCost = productCostMap.get(itemSku) || 0;
 
             if (existing) {
               existing.quantity += item.quantity;
@@ -331,15 +351,18 @@ export default function LiveMonitorPage() {
               existing.discount += item.discount || 0;
               existing.netSales += item.totalPrice;
               existing.transactionCount += 1;
+              existing.totalCost += unitCost * item.quantity;
             } else {
               productMap.set(key, {
                 productName: item.productName,
-                sku: item.sku || "N/A",
+                sku: itemSku,
                 quantity: item.quantity,
                 grossSales: item.grossPrice || item.totalPrice,
                 discount: item.discount || 0,
                 netSales: item.totalPrice,
                 transactionCount: 1,
+                cost: unitCost,
+                totalCost: unitCost * item.quantity,
               });
             }
           });
@@ -439,321 +462,208 @@ export default function LiveMonitorPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+      <header className="bg-white/95 backdrop-blur border-b border-gray-200 sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-xl font-bold text-gray-900 truncate">
                 StoreHub Live Monitor
               </h1>
-              <p className="mt-1 text-xs sm:text-sm text-gray-500">
-                Real-time transaction monitoring
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-              <div className="flex items-center gap-2">
-                <div
-                  className={`w-3 h-3 rounded-full ${
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span
+                  className={`w-2 h-2 rounded-full ${
                     connectionStatus === "connected"
                       ? "bg-green-500"
                       : connectionStatus === "disconnected"
                         ? "bg-red-500"
                         : "bg-yellow-500 animate-pulse"
                   }`}
-                ></div>
-                <span className="text-xs sm:text-sm text-gray-600">
+                />
+                <span className="text-[11px] text-gray-500">
                   {connectionStatus === "connected"
                     ? "Connected"
                     : connectionStatus === "disconnected"
                       ? "Disconnected"
                       : "Checking..."}
+                  {isMounted && stats.lastUpdated
+                    ? ` · ${stats.lastUpdated}`
+                    : ""}
                 </span>
               </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => setAutoRefresh(!autoRefresh)}
-                className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium ${
+                title="Toggle auto-refresh"
+                className={`px-2.5 py-1.5 rounded-md text-xs font-medium border ${
                   autoRefresh
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700"
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-600 border-gray-300"
                 }`}
               >
-                <span className="hidden sm:inline">
-                  {autoRefresh ? "Auto-refresh ON" : "Auto-refresh OFF"}
-                </span>
-                <span className="sm:hidden">
-                  {autoRefresh ? "Auto ON" : "Auto OFF"}
-                </span>
+                Auto {autoRefresh ? "ON" : "OFF"}
               </button>
               <button
                 onClick={fetchTransactions}
                 disabled={loading}
-                className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                className="px-2.5 py-1.5 bg-gray-900 text-white rounded-md text-xs font-medium hover:bg-gray-800 disabled:opacity-50"
               >
-                {loading ? "Refreshing..." : "Refresh"}
+                {loading ? "..." : "Refresh"}
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         {/* Date Filter */}
-        <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-6">
-          <div className="flex flex-col gap-4">
-            <div className="w-full">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date Range
-              </label>
-              <div className="grid grid-cols-2 sm:flex gap-2">
-                <button
-                  onClick={() => setDateFilter("today")}
-                  className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    dateFilter === "today"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  Today
-                </button>
-                <button
-                  onClick={() => setDateFilter("yesterday")}
-                  className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    dateFilter === "yesterday"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  Yesterday
-                </button>
-                <button
-                  onClick={() => setDateFilter("week")}
-                  className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    dateFilter === "week"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  <span className="hidden sm:inline">Last 7 Days</span>
-                  <span className="sm:hidden">Week</span>
-                </button>
-                <button
-                  onClick={() => setDateFilter("month")}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    dateFilter === "month"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  Last 30 Days
-                </button>
-                <button
-                  onClick={() => setDateFilter("custom")}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    dateFilter === "custom"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  Custom
-                </button>
-                <button
-                  onClick={() => {
-                    setCustomStartDate("2025-10-14");
-                    setCustomEndDate("2026-01-29");
-                    setDateFilter("custom");
-                  }}
-                  className="px-4 py-2 rounded-lg font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
-                  title="Show all available data (Oct 2025 - Jan 2026)"
-                >
-                  Show All Data
-                </button>
-              </div>
-            </div>
-
-            {dateFilter === "custom" && (
-              <div className="flex gap-4 items-end">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={customStartDate}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={customEndDate}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-            )}
+        <div className="mb-4">
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:flex-wrap">
+            {(
+              [
+                ["today", "Today"],
+                ["yesterday", "Yesterday"],
+                ["week", "7 Days"],
+                ["month", "30 Days"],
+                ["custom", "Custom"],
+              ] as [DateFilter, string][]
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setDateFilter(key)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-colors ${
+                  dateFilter === key
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
+
+          {dateFilter === "custom" && (
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          )}
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6">
-          <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-            <div className="text-xs sm:text-sm font-medium text-gray-500">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-3">
+            <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
               Gross Sales
             </div>
-            <div className="mt-2 text-xl sm:text-3xl font-bold text-gray-900">
+            <div className="mt-1 text-lg sm:text-xl font-bold text-gray-900 tabular-nums">
               {formatCurrency(stats.grossSales)}
             </div>
-            <div className="mt-1 text-xs text-gray-400">Before discounts</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-            <div className="text-xs sm:text-sm font-medium text-gray-500">
+          <div className="bg-white rounded-xl border border-gray-200 p-3">
+            <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
               Net Sales
             </div>
-            <div className="mt-2 text-xl sm:text-3xl font-bold text-green-600">
+            <div className="mt-1 text-lg sm:text-xl font-bold text-green-600 tabular-nums">
               {formatCurrency(stats.totalSales)}
             </div>
-            <div className="mt-1 text-xs text-gray-400">After discounts</div>
           </div>
 
-          <div className="bg-orange-50 border border-orange-200 rounded-lg shadow p-4 sm:p-6">
-            <div className="text-xs sm:text-sm font-medium text-orange-700">
+          <div className="bg-orange-50 rounded-xl border border-orange-200 p-3">
+            <div className="text-[11px] font-medium text-orange-700 uppercase tracking-wide">
               Discounts
             </div>
-            <div className="mt-2 text-xl sm:text-3xl font-bold text-orange-600">
+            <div className="mt-1 text-lg sm:text-xl font-bold text-orange-600 tabular-nums">
               {formatCurrency(stats.totalDiscount)}
             </div>
-            <div className="mt-1 text-xs text-orange-500">
+            <div className="text-[11px] text-orange-500">
               {stats.grossSales > 0
                 ? `${((stats.totalDiscount / stats.grossSales) * 100).toFixed(1)}% off`
                 : "0% off"}
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-            <div className="text-xs sm:text-sm font-medium text-gray-500">
-              Last Updated
-            </div>
-            <div className="mt-2 text-xl sm:text-3xl font-bold text-gray-900">
-              {isMounted ? stats.lastUpdated || "--:--:--" : "--:--:--"}
-            </div>
-          </div>
-        </div>
-
-        {/* Additional Stats */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-6 mb-6">
-          <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-            <div className="text-xs sm:text-sm font-medium text-gray-500">
+          <div className="bg-white rounded-xl border border-gray-200 p-3">
+            <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
               Transactions
             </div>
-            <div className="mt-2 text-xl sm:text-3xl font-bold text-gray-900">
+            <div className="mt-1 text-lg sm:text-xl font-bold text-gray-900 tabular-nums">
               {stats.transactionCount}
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-            <div className="text-xs sm:text-sm font-medium text-gray-500">
-              Avg Transaction
+          <div className="bg-white rounded-xl border border-gray-200 p-3">
+            <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+              Avg Ticket
             </div>
-            <div className="mt-2 text-xl sm:text-3xl font-bold text-gray-900">
+            <div className="mt-1 text-lg sm:text-xl font-bold text-gray-900 tabular-nums">
               {formatCurrency(stats.averageTransaction)}
             </div>
           </div>
         </div>
 
-        {/* Cancelled Transactions Cards */}
+        {/* Cancelled */}
         {stats.cancelledCount > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div className="bg-red-50 border border-red-200 rounded-lg shadow p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg
-                    className="h-8 w-8 text-red-600"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-4 flex-1">
-                  <div className="text-sm font-medium text-red-800">
-                    Cancelled Transactions
-                  </div>
-                  <div className="mt-1 text-2xl font-bold text-red-900">
-                    {stats.cancelledCount}
-                  </div>
-                </div>
-              </div>
+          <div className="flex items-center justify-between gap-3 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 mb-4">
+            <div className="text-xs font-medium text-red-800">
+              {stats.cancelledCount} cancelled transaction
+              {stats.cancelledCount > 1 ? "s" : ""}
             </div>
-
-            <div className="bg-red-50 border border-red-200 rounded-lg shadow p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg
-                    className="h-8 w-8 text-red-600"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-4 flex-1">
-                  <div className="text-sm font-medium text-red-800">
-                    Lost Revenue (Cancelled)
-                  </div>
-                  <div className="mt-1 text-2xl font-bold text-red-900">
-                    {formatCurrency(stats.cancelledTotal)}
-                  </div>
-                </div>
-              </div>
+            <div className="text-sm font-bold text-red-900 tabular-nums">
+              -{formatCurrency(stats.cancelledTotal)}
             </div>
           </div>
         )}
 
         {/* Payment Breakdown Cards */}
         {Object.keys(stats.paymentBreakdown).length > 0 && (
-          <div className="mb-8">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">
+          <div className="mb-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">
               Sales by Payment Method
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
               {Object.entries(stats.paymentBreakdown)
                 .sort((a, b) => b[1].total - a[1].total)
                 .map(([method, data]) => (
                   <div
                     key={method}
-                    className="bg-linear-to-br from-blue-50 to-white border border-blue-100 rounded-lg shadow p-3 sm:p-4"
+                    className="bg-white border border-gray-200 rounded-xl p-3"
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-xs sm:text-sm font-medium text-gray-700 truncate">
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <div className="text-[11px] font-medium text-gray-600 truncate">
                         {method}
                       </div>
-                      <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded shrink-0">
+                      <div className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
                         {data.count}
                       </div>
                     </div>
-                    <div className="text-lg sm:text-2xl font-bold text-gray-900">
+                    <div className="text-base sm:text-lg font-bold text-gray-900 tabular-nums">
                       {formatCurrency(data.total)}
                     </div>
-                    <div className="mt-1 text-xs text-gray-500">
-                      {((data.total / stats.totalSales) * 100).toFixed(1)}%
+                    <div className="mt-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500"
+                        style={{
+                          width: `${stats.totalSales > 0 ? (data.total / stats.totalSales) * 100 : 0}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="mt-1 text-[11px] text-gray-500">
+                      {stats.totalSales > 0
+                        ? ((data.total / stats.totalSales) * 100).toFixed(1)
+                        : "0.0"}
+                      %
                     </div>
                   </div>
                 ))}
@@ -763,47 +673,53 @@ export default function LiveMonitorPage() {
 
         {/* Sales by Products Table */}
         {productSales.length > 0 && (
-          <div className="mb-8">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">
+          <div className="mb-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">
               Sales by Products
             </h3>
-            <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               {/* Mobile Card View */}
-              <div className="block lg:hidden divide-y divide-gray-200">
+              <div className="block lg:hidden divide-y divide-gray-100">
                 {productSales.slice(0, 20).map((product, idx) => (
-                  <div key={idx} className="p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900 text-sm">
+                  <div key={idx} className="p-3">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="min-w-0">
+                        <div className="font-medium text-gray-900 text-sm truncate">
                           {product.productName}
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          SKU: {product.sku}
+                        <div className="text-[11px] text-gray-400">
+                          {product.sku}
                         </div>
                       </div>
-                      <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-                        {product.quantity} sold
+                      <span className="shrink-0 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[11px] font-semibold">
+                        {product.quantity}x
                       </span>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-sm mt-3">
+                    <div className="grid grid-cols-4 gap-1.5 mt-2 text-xs">
                       <div>
-                        <div className="text-xs text-gray-500">Gross</div>
-                        <div className="font-medium">
+                        <div className="text-[10px] text-gray-400">Gross</div>
+                        <div className="font-medium tabular-nums">
                           {formatCurrency(product.grossSales)}
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">Discount</div>
-                        <div className="font-medium text-orange-600">
+                        <div className="text-[10px] text-gray-400">Disc</div>
+                        <div className="font-medium text-orange-600 tabular-nums">
                           {product.discount > 0
                             ? `-${formatCurrency(product.discount)}`
-                            : "-"}
+                            : "–"}
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">Net Sales</div>
-                        <div className="font-bold text-green-600">
+                        <div className="text-[10px] text-gray-400">Net</div>
+                        <div className="font-semibold text-green-600 tabular-nums">
                           {formatCurrency(product.netSales)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-gray-400">Profit</div>
+                        <div className="font-semibold text-blue-600 tabular-nums">
+                          {formatCurrency(product.netSales - product.totalCost)}
                         </div>
                       </div>
                     </div>
@@ -813,64 +729,60 @@ export default function LiveMonitorPage() {
 
               {/* Desktop Table View */}
               <div className="hidden lg:block overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
                   <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        #
+                    <tr className="text-[11px] uppercase tracking-wide text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium">#</th>
+                      <th className="px-3 py-2 text-left font-medium">
+                        Product
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Product Name
+                      <th className="px-3 py-2 text-left font-medium">SKU</th>
+                      <th className="px-3 py-2 text-right font-medium">Qty</th>
+                      <th className="px-3 py-2 text-right font-medium">
+                        Gross
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        SKU
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Qty Sold
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Gross Sales
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-3 py-2 text-right font-medium">
                         Discount
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Net Sales
+                      <th className="px-3 py-2 text-right font-medium">Net</th>
+                      <th className="px-3 py-2 text-right font-medium">Cost</th>
+                      <th className="px-3 py-2 text-right font-medium">
+                        Profit
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Transactions
-                      </th>
+                      <th className="px-3 py-2 text-right font-medium">Txns</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white divide-y divide-gray-100">
                     {productSales.slice(0, 20).map((product, idx) => (
                       <tr key={idx} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {idx + 1}
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                        <td className="px-3 py-2 text-gray-400">{idx + 1}</td>
+                        <td className="px-3 py-2 font-medium text-gray-900">
                           {product.productName}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-3 py-2 text-gray-500 text-xs">
                           {product.sku}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded font-medium">
-                            {product.quantity}
-                          </span>
+                        <td className="px-3 py-2 text-right font-medium text-gray-900 tabular-nums">
+                          {product.quantity}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-3 py-2 text-right text-gray-900 tabular-nums">
                           {formatCurrency(product.grossSales)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600 font-medium">
+                        <td className="px-3 py-2 text-right text-orange-600 tabular-nums">
                           {product.discount > 0
                             ? `-${formatCurrency(product.discount)}`
-                            : "-"}
+                            : "–"}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">
+                        <td className="px-3 py-2 text-right font-semibold text-green-600 tabular-nums">
                           {formatCurrency(product.netSales)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-3 py-2 text-right text-gray-500 tabular-nums">
+                          {formatCurrency(product.totalCost)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold text-blue-600 tabular-nums">
+                          {formatCurrency(product.netSales - product.totalCost)}
+                        </td>
+                        <td className="px-3 py-2 text-right text-gray-500 tabular-nums">
                           {product.transactionCount}
                         </td>
                       </tr>
@@ -884,123 +796,85 @@ export default function LiveMonitorPage() {
 
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center">
-              <div className="text-red-800">
-                <strong>Error:</strong> {error}
-              </div>
-            </div>
+          <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-4 text-xs text-red-800">
+            {error}
           </div>
         )}
 
         {/* Transactions Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-3 sm:px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-900">
               Recent Transactions
             </h2>
+            <span className="text-[11px] text-gray-500">
+              {transactions.length} shown
+            </span>
           </div>
 
           {/* Mobile Card View */}
           <div className="block lg:hidden">
             {loading && transactions.length === 0 ? (
-              <div className="px-4 py-12 text-center text-gray-500">
+              <div className="px-4 py-10 text-center text-sm text-gray-500">
                 Loading transactions...
               </div>
             ) : transactions.length === 0 ? (
-              <div className="px-4 py-12 text-center text-gray-500">
+              <div className="px-4 py-10 text-center text-sm text-gray-500">
                 No transactions found for {getDateFilterLabel().toLowerCase()}
               </div>
             ) : (
-              <div className="divide-y divide-gray-200">
+              <div className="divide-y divide-gray-100">
                 {transactions.map((transaction) => {
                   const hasDiscount = (transaction.discount ?? 0) > 0;
                   return (
                     <div
                       key={transaction.id}
-                      className={`p-4 ${hasDiscount ? "bg-orange-50 border-l-4 border-orange-400" : ""}`}
+                      className={`px-3 py-2.5 ${hasDiscount ? "bg-orange-50/60" : ""}`}
                     >
-                      {/* Header */}
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900 text-sm">
-                            {transaction.receiptNumber}
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            {formatDate(transaction.timestamp)}{" "}
-                            {formatTime(transaction.timestamp)}
-                          </div>
-                        </div>
-                        <span
-                          className={`px-2 py-1 text-xs rounded-full ${
-                            transaction.status === "completed"
-                              ? "bg-green-100 text-green-800"
-                              : transaction.status === "cancelled"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          {transaction.status}
-                        </span>
-                      </div>
-
-                      {/* Badges */}
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {hasDiscount && (
-                          <span className="px-2 py-1 bg-orange-600 text-white rounded text-xs font-bold">
-                            DISCOUNTED
-                          </span>
-                        )}
-                        <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                          {getPaymentDisplay(transaction)}
-                        </span>
-                      </div>
-
-                      {/* Items */}
-                      <div className="mb-3">
-                        {transaction.items.slice(0, 2).map((item, idx) => (
-                          <div key={idx} className="text-sm text-gray-600 mb-1">
-                            {item.quantity}x {item.productName}
-                            {(item.discount ?? 0) > 0 && (
-                              <span className="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">
-                                -{formatCurrency(item.discount!)} off
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium text-gray-900 text-xs truncate">
+                              {transaction.receiptNumber}
+                            </span>
+                            {transaction.status !== "completed" && (
+                              <span
+                                className={`px-1.5 py-0.5 text-[10px] rounded-full ${
+                                  transaction.status === "cancelled"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-yellow-100 text-yellow-700"
+                                }`}
+                              >
+                                {transaction.status}
                               </span>
                             )}
                           </div>
-                        ))}
-                        {transaction.items.length > 2 && (
-                          <div className="text-xs text-gray-400">
-                            +{transaction.items.length - 2} more...
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Pricing */}
-                      <div className="grid grid-cols-3 gap-2 text-sm">
-                        <div>
-                          <div className="text-xs text-gray-500">Subtotal</div>
-                          <div className="font-medium">
-                            {formatCurrency(transaction.total)}
+                          <div className="text-[11px] text-gray-500 mt-0.5">
+                            {formatDate(transaction.timestamp)}{" "}
+                            {formatTime(transaction.timestamp)} ·{" "}
+                            {getPaymentDisplay(transaction)}
                           </div>
                         </div>
-                        <div>
-                          <div className="text-xs text-gray-500">Discount</div>
-                          <div className="font-medium text-orange-600">
-                            {hasDiscount
-                              ? `-${formatCurrency(transaction.discount!)}`
-                              : "-"}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-500">
-                            Final Price
-                          </div>
-                          <div className="font-bold text-green-600">
+                        <div className="text-right shrink-0">
+                          <div className="font-bold text-sm text-green-600 tabular-nums">
                             {formatCurrency(
                               transaction.total - (transaction.discount || 0),
                             )}
                           </div>
+                          {hasDiscount && (
+                            <div className="text-[10px] text-orange-600 tabular-nums">
+                              -{formatCurrency(transaction.discount!)}
+                            </div>
+                          )}
                         </div>
+                      </div>
+                      <div className="mt-1 text-[11px] text-gray-500 truncate">
+                        {transaction.items
+                          .slice(0, 3)
+                          .map((i) => `${i.quantity}× ${i.productName}`)
+                          .join(", ")}
+                        {transaction.items.length > 3 &&
+                          ` +${transaction.items.length - 3}`}
                       </div>
                     </div>
                   );
@@ -1012,112 +886,86 @@ export default function LiveMonitorPage() {
           {/* Desktop Table View */}
           <div className="hidden lg:block overflow-x-auto">
             {loading && transactions.length === 0 ? (
-              <div className="px-6 py-12 text-center text-gray-500">
+              <div className="px-6 py-10 text-center text-sm text-gray-500">
                 Loading transactions...
               </div>
             ) : transactions.length === 0 ? (
-              <div className="px-6 py-12 text-center text-gray-500">
+              <div className="px-6 py-10 text-center text-sm text-gray-500">
                 No transactions found for {getDateFilterLabel().toLowerCase()}
               </div>
             ) : (
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date & Time
+                  <tr className="text-[11px] uppercase tracking-wide text-gray-500">
+                    <th className="px-3 py-2 text-left font-medium">
+                      Date &amp; Time
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Receipt #
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Items
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Payment
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-left font-medium">Receipt</th>
+                    <th className="px-3 py-2 text-left font-medium">Items</th>
+                    <th className="px-3 py-2 text-left font-medium">Payment</th>
+                    <th className="px-3 py-2 text-right font-medium">
                       Subtotal
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-right font-medium">
                       Discount
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Final Price
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
+                    <th className="px-3 py-2 text-right font-medium">Total</th>
+                    <th className="px-3 py-2 text-left font-medium">Status</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white divide-y divide-gray-100">
                   {transactions.map((transaction) => {
                     const hasDiscount = (transaction.discount ?? 0) > 0;
                     return (
                       <tr
                         key={transaction.id}
-                        className={`hover:bg-gray-50 ${hasDiscount ? "bg-orange-50 border-l-4 border-orange-400" : ""}`}
+                        className={`hover:bg-gray-50 ${hasDiscount ? "bg-orange-50/60" : ""}`}
                       >
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div>{formatDate(transaction.timestamp)}</div>
-                          <div className="text-gray-500">
+                        <td className="px-3 py-2 whitespace-nowrap text-gray-900">
+                          <div className="text-xs">
+                            {formatDate(transaction.timestamp)}
+                          </div>
+                          <div className="text-[11px] text-gray-500">
                             {formatTime(transaction.timestamp)}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          <div className="flex items-center">
-                            {transaction.receiptNumber}
-                            {hasDiscount && (
-                              <span className="ml-2 px-2 py-1 bg-orange-600 text-white rounded text-xs font-bold">
-                                DISCOUNTED
-                              </span>
-                            )}
-                          </div>
+                        <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
+                          {transaction.receiptNumber}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          <div className="max-w-xs">
-                            {transaction.items.slice(0, 2).map((item, idx) => (
-                              <div key={idx} className="mb-1">
-                                {item.quantity}x {item.productName}
-                                {(item.discount ?? 0) > 0 && (
-                                  <span className="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-medium">
-                                    -{formatCurrency(item.discount!)} off
-                                  </span>
-                                )}
-                              </div>
-                            ))}
-                            {transaction.items.length > 2 && (
-                              <div className="text-gray-400">
-                                +{transaction.items.length - 2} more...
-                              </div>
-                            )}
-                          </div>
+                        <td className="px-3 py-2 text-xs text-gray-500 max-w-xs truncate">
+                          {transaction.items
+                            .slice(0, 3)
+                            .map((i) => `${i.quantity}× ${i.productName}`)
+                            .join(", ")}
+                          {transaction.items.length > 3 &&
+                            ` +${transaction.items.length - 3}`}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <span className="px-2 py-1 bg-gray-100 rounded text-xs">
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <span className="px-1.5 py-0.5 bg-gray-100 rounded text-[11px] text-gray-600">
                             {getPaymentDisplay(transaction)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-3 py-2 text-right whitespace-nowrap text-gray-900 tabular-nums">
                           {formatCurrency(transaction.total)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600 font-medium">
+                        <td className="px-3 py-2 text-right whitespace-nowrap text-orange-600 tabular-nums">
                           {hasDiscount
                             ? `-${formatCurrency(transaction.discount!)}`
-                            : "-"}
+                            : "–"}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">
+                        <td className="px-3 py-2 text-right whitespace-nowrap font-semibold text-green-600 tabular-nums">
                           {formatCurrency(
                             transaction.total - (transaction.discount || 0),
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 py-2 whitespace-nowrap">
                           <span
-                            className={`px-2 py-1 text-xs rounded-full ${
+                            className={`px-1.5 py-0.5 text-[10px] rounded-full ${
                               transaction.status === "completed"
-                                ? "bg-green-100 text-green-800"
+                                ? "bg-green-100 text-green-700"
                                 : transaction.status === "cancelled"
-                                  ? "bg-red-100 text-red-800"
-                                  : "bg-yellow-100 text-yellow-800"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-yellow-100 text-yellow-700"
                             }`}
                           >
                             {transaction.status}

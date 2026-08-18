@@ -290,6 +290,70 @@ export async function getTransactions(filters?: {
     const paymentMethod: "cash" | "card" | "qr" | "other" =
       transformPaymentMethod(payments);
 
+    // Get transaction-level discount
+    const transactionDiscount = (txn.discount as number) || 0;
+    const transactionSubtotal = (txn.subTotal as number) || 0;
+
+    // First pass: calculate items with their gross values
+    const rawItems = ((txn.items as Record<string, unknown>[]) || []).map(
+      (item: Record<string, unknown>) => {
+        const productId = item.productId as string;
+        const productInfo = productLookup.get(productId);
+
+        const netTotal = (item.total as number) || 0;
+        const itemLevelDiscount = (item.discount as number) || 0;
+        const subTotal =
+          typeof item.subTotal === "number" ? (item.subTotal as number) : 0;
+        // Gross must always be before item-level discount
+        const grossTotal = Math.max(subTotal, netTotal + itemLevelDiscount);
+        const quantity = (item.quantity as number) || 0;
+
+        return {
+          productId,
+          productInfo,
+          netTotal,
+          itemLevelDiscount,
+          grossTotal,
+          quantity,
+          unitPrice: (item.unitPrice as number) || 0,
+          sku: item.sku as string,
+          productName: item.productName as string,
+        };
+      },
+    );
+
+    // Calculate total gross amount for proportional distribution
+    const totalGross = rawItems.reduce((sum, item) => sum + item.grossTotal, 0);
+
+    // Second pass: distribute transaction-level discount proportionally
+    const items = rawItems.map((item) => {
+      // Calculate proportional share of transaction discount
+      const proportionalDiscount =
+        totalGross > 0 && transactionDiscount > 0
+          ? (item.grossTotal / totalGross) * transactionDiscount
+          : 0;
+
+      // Total discount = item-level discount + proportional transaction discount
+      const totalItemDiscount = item.itemLevelDiscount + proportionalDiscount;
+
+      // Net = gross - all discounts applicable to this item
+      const netTotal = item.grossTotal - totalItemDiscount;
+
+      return {
+        sku: item.productInfo?.sku || item.sku || item.productId,
+        productName:
+          item.productInfo?.name ||
+          item.productName ||
+          `Item ${item.productId}`,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: netTotal,
+        grossPrice: item.grossTotal,
+        discount: totalItemDiscount,
+        netUnitPrice: item.quantity > 0 ? netTotal / item.quantity : netTotal,
+      };
+    });
+
     return {
       id: (txn.refId as string) || (txn.id as string),
       receiptNumber: (txn.invoiceNumber as string) || "",
@@ -298,36 +362,9 @@ export async function getTransactions(filters?: {
       registerId: (txn.registerId as string) || "",
       employeeId: (txn.employeeId as string) || "",
       customerId: undefined,
-      items: ((txn.items as Record<string, unknown>[]) || []).map(
-        (item: Record<string, unknown>) => {
-          const productId = item.productId as string;
-          const productInfo = productLookup.get(productId);
-
-          const netTotal = (item.total as number) || 0;
-          const itemDiscount = (item.discount as number) || 0;
-          const grossTotal =
-            typeof item.subTotal === "number"
-              ? (item.subTotal as number)
-              : netTotal + itemDiscount;
-          const quantity = (item.quantity as number) || 0;
-
-          return {
-            sku: productInfo?.sku || (item.sku as string) || productId,
-            productName:
-              productInfo?.name ||
-              (item.productName as string) ||
-              `Item ${productId}`,
-            quantity,
-            unitPrice: (item.unitPrice as number) || 0,
-            totalPrice: netTotal,
-            grossPrice: grossTotal,
-            discount: itemDiscount,
-            netUnitPrice: quantity > 0 ? netTotal / quantity : netTotal,
-          };
-        },
-      ),
-      subtotal: (txn.subTotal as number) || 0,
-      discount: (txn.discount as number) || 0,
+      items,
+      subtotal: transactionSubtotal,
+      discount: transactionDiscount,
       tax: (txn.tax as number) || 0,
       total: (txn.total as number) || 0,
       paymentMethod,
