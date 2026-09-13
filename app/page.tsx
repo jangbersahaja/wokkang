@@ -1,6 +1,18 @@
 "use client";
 
+import {
+  CalendarDays,
+  ChartColumn,
+  CircleDollarSign,
+  Receipt,
+  Tags,
+  WalletCards,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { AppHeader } from "../components/dashboard/AppHeader";
+import { MetricCard } from "../components/dashboard/MetricCard";
+import { PaymentMethodCard } from "../components/dashboard/PaymentMethodCard";
+import { StatusBadge } from "../components/dashboard/StatusBadge";
 
 interface Transaction {
   id: string;
@@ -453,72 +465,48 @@ export default function LiveMonitorPage() {
     }
     // Online channels like GrabFood, Foodpanda, etc.
     return (
-      <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+      <span className="ml-2 rounded-full bg-[var(--wk-brand)]/10 px-2 py-1 text-xs font-bold text-[var(--wk-brand)]">
         {channel.replace(/_/g, " ")}
       </span>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white/95 backdrop-blur border-b border-gray-200 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <h1 className="text-base sm:text-xl font-bold text-gray-900 truncate">
-                StoreHub Live Monitor
-              </h1>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    connectionStatus === "connected"
-                      ? "bg-green-500"
-                      : connectionStatus === "disconnected"
-                        ? "bg-red-500"
-                        : "bg-yellow-500 animate-pulse"
-                  }`}
-                />
-                <span className="text-[11px] text-gray-500">
-                  {connectionStatus === "connected"
-                    ? "Connected"
-                    : connectionStatus === "disconnected"
-                      ? "Disconnected"
-                      : "Checking..."}
-                  {isMounted && stats.lastUpdated
-                    ? ` · ${stats.lastUpdated}`
-                    : ""}
-                </span>
+    <div className="min-h-screen">
+      <AppHeader
+        autoRefresh={autoRefresh}
+        connectionStatus={connectionStatus}
+        isLoading={loading}
+        lastUpdated={isMounted ? stats.lastUpdated : ""}
+        onRefresh={fetchTransactions}
+        onToggleAutoRefresh={() => setAutoRefresh(!autoRefresh)}
+      />
+
+      <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
+        {/* Date Filter */}
+        <section className="mb-8 border-b border-[var(--wk-line)] pb-7">
+          <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-[var(--wk-brand)]">
+                <span className="h-2 w-2 rounded-full bg-[var(--wk-cyan)]" />{" "}
+                Live operations
               </div>
+              <h1 className="text-3xl font-black tracking-[0.01em] text-[var(--wk-ink)] sm:text-4xl">
+                Sales pulse
+              </h1>
+              <p className="mt-2 text-sm font-medium text-[var(--wk-muted)]">
+                StoreHub performance for {getDateFilterLabel().toLowerCase()}.
+              </p>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={() => setAutoRefresh(!autoRefresh)}
-                title="Toggle auto-refresh"
-                className={`px-2.5 py-1.5 rounded-md text-xs font-medium border ${
-                  autoRefresh
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white text-gray-600 border-gray-300"
-                }`}
-              >
-                Auto {autoRefresh ? "ON" : "OFF"}
-              </button>
-              <button
-                onClick={fetchTransactions}
-                disabled={loading}
-                className="px-2.5 py-1.5 bg-gray-900 text-white rounded-md text-xs font-medium hover:bg-gray-800 disabled:opacity-50"
-              >
-                {loading ? "..." : "Refresh"}
-              </button>
+            <div className="flex items-center gap-2 text-xs font-bold text-[var(--wk-muted)]">
+              <CalendarDays
+                className="h-4 w-4 text-[var(--wk-brand)]"
+                aria-hidden="true"
+              />
+              Malaysia time (UTC+8)
             </div>
           </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-        {/* Date Filter */}
-        <div className="mb-4">
-          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:flex-wrap">
+          <div className="flex gap-1.5 overflow-x-auto pb-1 sm:flex-wrap">
             {(
               [
                 ["today", "Today"],
@@ -531,10 +519,10 @@ export default function LiveMonitorPage() {
               <button
                 key={key}
                 onClick={() => setDateFilter(key)}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-colors ${
+                className={`shrink-0 rounded-md px-3 py-2 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wk-brand)] ${
                   dateFilter === key
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                    ? "bg-[var(--wk-ink)] text-white shadow-[3px_3px_0_var(--wk-cyan)]"
+                    : "border border-[var(--wk-line-strong)] bg-white text-[var(--wk-muted)] hover:border-[var(--wk-ink)] hover:text-[var(--wk-ink)]"
                 }`}
               >
                 {label}
@@ -543,84 +531,77 @@ export default function LiveMonitorPage() {
           </div>
 
           {dateFilter === "custom" && (
-            <div className="grid grid-cols-2 gap-2 mt-2">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <input
                 type="date"
                 value={customStartDate}
                 onChange={(e) => setCustomStartDate(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="rounded-md border border-[var(--wk-line-strong)] bg-white px-3 py-2 text-sm font-medium text-[var(--wk-ink)] focus:outline-2 focus:outline-offset-2 focus:outline-[var(--wk-brand)]"
               />
               <input
                 type="date"
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="rounded-md border border-[var(--wk-line-strong)] bg-white px-3 py-2 text-sm font-medium text-[var(--wk-ink)] focus:outline-2 focus:outline-offset-2 focus:outline-[var(--wk-brand)]"
               />
             </div>
           )}
-        </div>
+        </section>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-3">
-            <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
-              Gross Sales
-            </div>
-            <div className="mt-1 text-lg sm:text-xl font-bold text-gray-900 tabular-nums">
-              {formatCurrency(stats.grossSales)}
-            </div>
+        <section className="mb-8">
+          <div className="mb-3 flex items-center justify-between gap-4">
+            <h2 className="text-sm font-black uppercase tracking-[0.08em] text-[var(--wk-ink)]">
+              Performance
+            </h2>
+            <span className="text-xs font-semibold text-[var(--wk-muted)]">
+              Live calculation
+            </span>
           </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-3">
-            <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
-              Net Sales
-            </div>
-            <div className="mt-1 text-lg sm:text-xl font-bold text-green-600 tabular-nums">
-              {formatCurrency(stats.totalSales)}
-            </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <MetricCard
+              label="Gross sales"
+              value={formatCurrency(stats.grossSales)}
+              icon={<CircleDollarSign className="h-4 w-4" aria-hidden="true" />}
+            />
+            <MetricCard
+              label="Net sales"
+              value={formatCurrency(stats.totalSales)}
+              tone="success"
+              icon={<ChartColumn className="h-4 w-4" aria-hidden="true" />}
+            />
+            <MetricCard
+              label="Discounts"
+              value={formatCurrency(stats.totalDiscount)}
+              detail={
+                stats.grossSales > 0
+                  ? `${((stats.totalDiscount / stats.grossSales) * 100).toFixed(1)}% of gross sales`
+                  : "No discounts applied"
+              }
+              tone="warning"
+              icon={<Tags className="h-4 w-4" aria-hidden="true" />}
+            />
+            <MetricCard
+              label="Transactions"
+              value={String(stats.transactionCount)}
+              icon={<Receipt className="h-4 w-4" aria-hidden="true" />}
+            />
+            <MetricCard
+              label="Average ticket"
+              value={formatCurrency(stats.averageTransaction)}
+              icon={<WalletCards className="h-4 w-4" aria-hidden="true" />}
+            />
           </div>
-
-          <div className="bg-orange-50 rounded-xl border border-orange-200 p-3">
-            <div className="text-[11px] font-medium text-orange-700 uppercase tracking-wide">
-              Discounts
-            </div>
-            <div className="mt-1 text-lg sm:text-xl font-bold text-orange-600 tabular-nums">
-              {formatCurrency(stats.totalDiscount)}
-            </div>
-            <div className="text-[11px] text-orange-500">
-              {stats.grossSales > 0
-                ? `${((stats.totalDiscount / stats.grossSales) * 100).toFixed(1)}% off`
-                : "0% off"}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-3">
-            <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
-              Transactions
-            </div>
-            <div className="mt-1 text-lg sm:text-xl font-bold text-gray-900 tabular-nums">
-              {stats.transactionCount}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-3">
-            <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
-              Avg Ticket
-            </div>
-            <div className="mt-1 text-lg sm:text-xl font-bold text-gray-900 tabular-nums">
-              {formatCurrency(stats.averageTransaction)}
-            </div>
-          </div>
-        </div>
+        </section>
 
         {/* Cancelled */}
         {stats.cancelledCount > 0 && (
-          <div className="flex items-center justify-between gap-3 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 mb-4">
-            <div className="text-xs font-medium text-red-800">
+          <div className="mb-8 flex items-center justify-between gap-3 border border-[var(--wk-danger)] bg-[var(--wk-danger-soft)] px-4 py-3">
+            <div className="text-xs font-bold text-[var(--wk-danger)]">
               {stats.cancelledCount} cancelled transaction
               {stats.cancelledCount > 1 ? "s" : ""}
             </div>
-            <div className="text-sm font-bold text-red-900 tabular-nums">
+            <div className="text-sm font-black text-[var(--wk-danger)] tabular-nums">
               -{formatCurrency(stats.cancelledTotal)}
             </div>
           </div>
@@ -628,97 +609,98 @@ export default function LiveMonitorPage() {
 
         {/* Payment Breakdown Cards */}
         {Object.keys(stats.paymentBreakdown).length > 0 && (
-          <div className="mb-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">
-              Sales by Payment Method
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          <section className="mb-9">
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--wk-brand)]">
+                  Payments
+                </p>
+                <h2 className="mt-1 text-xl font-black text-[var(--wk-ink)]">
+                  Where sales landed
+                </h2>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
               {Object.entries(stats.paymentBreakdown)
                 .sort((a, b) => b[1].total - a[1].total)
                 .map(([method, data]) => (
-                  <div
+                  <PaymentMethodCard
                     key={method}
-                    className="bg-white border border-gray-200 rounded-xl p-3"
-                  >
-                    <div className="flex items-center justify-between gap-1 mb-1">
-                      <div className="text-[11px] font-medium text-gray-600 truncate">
-                        {method}
-                      </div>
-                      <div className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
-                        {data.count}
-                      </div>
-                    </div>
-                    <div className="text-base sm:text-lg font-bold text-gray-900 tabular-nums">
-                      {formatCurrency(data.total)}
-                    </div>
-                    <div className="mt-1 h-1 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-blue-500"
-                        style={{
-                          width: `${stats.totalSales > 0 ? (data.total / stats.totalSales) * 100 : 0}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="mt-1 text-[11px] text-gray-500">
-                      {stats.totalSales > 0
-                        ? ((data.total / stats.totalSales) * 100).toFixed(1)
-                        : "0.0"}
-                      %
-                    </div>
-                  </div>
+                    method={method}
+                    count={data.count}
+                    total={formatCurrency(data.total)}
+                    percentage={
+                      stats.totalSales > 0
+                        ? (data.total / stats.totalSales) * 100
+                        : 0
+                    }
+                  />
                 ))}
             </div>
-          </div>
+          </section>
         )}
 
         {/* Sales by Products Table */}
         {productSales.length > 0 && (
-          <div className="mb-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">
-              Sales by Products
-            </h3>
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <section className="mb-9">
+            <div className="mb-3">
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--wk-brand)]">
+                Products
+              </p>
+              <h2 className="mt-1 text-xl font-black text-[var(--wk-ink)]">
+                What is moving
+              </h2>
+            </div>
+            <div className="overflow-hidden border border-[var(--wk-line-strong)] bg-white shadow-[0_1px_0_rgb(16_23_42_/_0.02)]">
               {/* Mobile Card View */}
-              <div className="block lg:hidden divide-y divide-gray-100">
+              <div className="block divide-y divide-[var(--wk-line)] lg:hidden">
                 {productSales.slice(0, 20).map((product, idx) => (
-                  <div key={idx} className="p-3">
+                  <div key={idx} className="p-4">
                     <div className="flex justify-between items-start gap-2">
                       <div className="min-w-0">
-                        <div className="font-medium text-gray-900 text-sm truncate">
+                        <div className="truncate text-sm font-bold text-[var(--wk-ink)]">
                           {product.productName}
                         </div>
-                        <div className="text-[11px] text-gray-400">
+                        <div className="text-[11px] font-medium text-[var(--wk-faint)]">
                           {product.sku}
                         </div>
                       </div>
-                      <span className="shrink-0 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[11px] font-semibold">
+                      <span className="shrink-0 rounded-full bg-[var(--wk-brand)]/10 px-2 py-0.5 text-[11px] font-bold text-[var(--wk-brand)]">
                         {product.quantity}x
                       </span>
                     </div>
-                    <div className="grid grid-cols-4 gap-1.5 mt-2 text-xs">
+                    <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
                       <div>
-                        <div className="text-[10px] text-gray-400">Gross</div>
-                        <div className="font-medium tabular-nums">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--wk-faint)]">
+                          Gross
+                        </div>
+                        <div className="font-semibold tabular-nums text-[var(--wk-ink)]">
                           {formatCurrency(product.grossSales)}
                         </div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-gray-400">Disc</div>
-                        <div className="font-medium text-orange-600 tabular-nums">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--wk-faint)]">
+                          Disc
+                        </div>
+                        <div className="font-semibold text-[var(--wk-warning)] tabular-nums">
                           {product.discount > 0
                             ? `-${formatCurrency(product.discount)}`
                             : "–"}
                         </div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-gray-400">Net</div>
-                        <div className="font-semibold text-green-600 tabular-nums">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--wk-faint)]">
+                          Net
+                        </div>
+                        <div className="font-bold text-[var(--wk-success)] tabular-nums">
                           {formatCurrency(product.netSales)}
                         </div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-gray-400">Profit</div>
-                        <div className="font-semibold text-blue-600 tabular-nums">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--wk-faint)]">
+                          Profit
+                        </div>
+                        <div className="font-bold text-[var(--wk-brand)] tabular-nums">
                           {formatCurrency(product.netSales - product.totalCost)}
                         </div>
                       </div>
@@ -728,61 +710,60 @@ export default function LiveMonitorPage() {
               </div>
 
               {/* Desktop Table View */}
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr className="text-[11px] uppercase tracking-wide text-gray-500">
-                      <th className="px-3 py-2 text-left font-medium">#</th>
-                      <th className="px-3 py-2 text-left font-medium">
-                        Product
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium">SKU</th>
-                      <th className="px-3 py-2 text-right font-medium">Qty</th>
-                      <th className="px-3 py-2 text-right font-medium">
-                        Gross
-                      </th>
-                      <th className="px-3 py-2 text-right font-medium">
+              <div className="hidden overflow-x-auto lg:block">
+                <table className="min-w-full divide-y divide-[var(--wk-line)] text-sm">
+                  <thead className="bg-[var(--wk-canvas)]">
+                    <tr className="text-[11px] font-bold uppercase tracking-[0.07em] text-[var(--wk-muted)]">
+                      <th className="px-4 py-3 text-left font-bold">#</th>
+                      <th className="px-4 py-3 text-left font-bold">Product</th>
+                      <th className="px-4 py-3 text-left font-bold">SKU</th>
+                      <th className="px-4 py-3 text-right font-bold">Qty</th>
+                      <th className="px-4 py-3 text-right font-bold">Gross</th>
+                      <th className="px-4 py-3 text-right font-bold">
                         Discount
                       </th>
-                      <th className="px-3 py-2 text-right font-medium">Net</th>
-                      <th className="px-3 py-2 text-right font-medium">Cost</th>
-                      <th className="px-3 py-2 text-right font-medium">
-                        Profit
-                      </th>
-                      <th className="px-3 py-2 text-right font-medium">Txns</th>
+                      <th className="px-4 py-3 text-right font-bold">Net</th>
+                      <th className="px-4 py-3 text-right font-bold">Cost</th>
+                      <th className="px-4 py-3 text-right font-bold">Profit</th>
+                      <th className="px-4 py-3 text-right font-bold">Txns</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-100">
+                  <tbody className="divide-y divide-[var(--wk-line)] bg-white">
                     {productSales.slice(0, 20).map((product, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 text-gray-400">{idx + 1}</td>
-                        <td className="px-3 py-2 font-medium text-gray-900">
+                      <tr
+                        key={idx}
+                        className="transition-colors hover:bg-[var(--wk-canvas)]"
+                      >
+                        <td className="px-4 py-3 font-medium text-[var(--wk-faint)]">
+                          {idx + 1}
+                        </td>
+                        <td className="px-4 py-3 font-bold text-[var(--wk-ink)]">
                           {product.productName}
                         </td>
-                        <td className="px-3 py-2 text-gray-500 text-xs">
+                        <td className="px-4 py-3 text-xs font-medium text-[var(--wk-muted)]">
                           {product.sku}
                         </td>
-                        <td className="px-3 py-2 text-right font-medium text-gray-900 tabular-nums">
+                        <td className="px-4 py-3 text-right font-semibold text-[var(--wk-ink)] tabular-nums">
                           {product.quantity}
                         </td>
-                        <td className="px-3 py-2 text-right text-gray-900 tabular-nums">
+                        <td className="px-4 py-3 text-right text-[var(--wk-ink)] tabular-nums">
                           {formatCurrency(product.grossSales)}
                         </td>
-                        <td className="px-3 py-2 text-right text-orange-600 tabular-nums">
+                        <td className="px-4 py-3 text-right text-[var(--wk-warning)] tabular-nums">
                           {product.discount > 0
                             ? `-${formatCurrency(product.discount)}`
                             : "–"}
                         </td>
-                        <td className="px-3 py-2 text-right font-semibold text-green-600 tabular-nums">
+                        <td className="px-4 py-3 text-right font-bold text-[var(--wk-success)] tabular-nums">
                           {formatCurrency(product.netSales)}
                         </td>
-                        <td className="px-3 py-2 text-right text-gray-500 tabular-nums">
+                        <td className="px-4 py-3 text-right text-[var(--wk-muted)] tabular-nums">
                           {formatCurrency(product.totalCost)}
                         </td>
-                        <td className="px-3 py-2 text-right font-semibold text-blue-600 tabular-nums">
+                        <td className="px-4 py-3 text-right font-bold text-[var(--wk-brand)] tabular-nums">
                           {formatCurrency(product.netSales - product.totalCost)}
                         </td>
-                        <td className="px-3 py-2 text-right text-gray-500 tabular-nums">
+                        <td className="px-4 py-3 text-right text-[var(--wk-muted)] tabular-nums">
                           {product.transactionCount}
                         </td>
                       </tr>
@@ -791,194 +772,182 @@ export default function LiveMonitorPage() {
                 </table>
               </div>
             </div>
-          </div>
+          </section>
         )}
 
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-4 text-xs text-red-800">
+          <div className="mb-6 border border-[var(--wk-danger)] bg-[var(--wk-danger-soft)] px-4 py-3 text-xs font-bold text-[var(--wk-danger)]">
             {error}
           </div>
         )}
 
         {/* Transactions Table */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-3 sm:px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-900">
-              Recent Transactions
-            </h2>
-            <span className="text-[11px] text-gray-500">
+        <section>
+          <div className="mb-3 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--wk-brand)]">
+                Activity
+              </p>
+              <h2 className="mt-1 text-xl font-black text-[var(--wk-ink)]">
+                Recent transactions
+              </h2>
+            </div>
+            <span className="text-xs font-semibold text-[var(--wk-muted)]">
               {transactions.length} shown
             </span>
           </div>
-
-          {/* Mobile Card View */}
-          <div className="block lg:hidden">
-            {loading && transactions.length === 0 ? (
-              <div className="px-4 py-10 text-center text-sm text-gray-500">
-                Loading transactions...
-              </div>
-            ) : transactions.length === 0 ? (
-              <div className="px-4 py-10 text-center text-sm text-gray-500">
-                No transactions found for {getDateFilterLabel().toLowerCase()}
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {transactions.map((transaction) => {
-                  const hasDiscount = (transaction.discount ?? 0) > 0;
-                  return (
-                    <div
-                      key={transaction.id}
-                      className={`px-3 py-2.5 ${hasDiscount ? "bg-orange-50/60" : ""}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-medium text-gray-900 text-xs truncate">
-                              {transaction.receiptNumber}
-                            </span>
-                            {transaction.status !== "completed" && (
-                              <span
-                                className={`px-1.5 py-0.5 text-[10px] rounded-full ${
-                                  transaction.status === "cancelled"
-                                    ? "bg-red-100 text-red-700"
-                                    : "bg-yellow-100 text-yellow-700"
-                                }`}
-                              >
-                                {transaction.status}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[11px] text-gray-500 mt-0.5">
-                            {formatDate(transaction.timestamp)}{" "}
-                            {formatTime(transaction.timestamp)} ·{" "}
-                            {getPaymentDisplay(transaction)}
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <div className="font-bold text-sm text-green-600 tabular-nums">
-                            {formatCurrency(
-                              transaction.total - (transaction.discount || 0),
-                            )}
-                          </div>
-                          {hasDiscount && (
-                            <div className="text-[10px] text-orange-600 tabular-nums">
-                              -{formatCurrency(transaction.discount!)}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="mt-1 text-[11px] text-gray-500 truncate">
-                        {transaction.items
-                          .slice(0, 3)
-                          .map((i) => `${i.quantity}× ${i.productName}`)
-                          .join(", ")}
-                        {transaction.items.length > 3 &&
-                          ` +${transaction.items.length - 3}`}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Desktop Table View */}
-          <div className="hidden lg:block overflow-x-auto">
-            {loading && transactions.length === 0 ? (
-              <div className="px-6 py-10 text-center text-sm text-gray-500">
-                Loading transactions...
-              </div>
-            ) : transactions.length === 0 ? (
-              <div className="px-6 py-10 text-center text-sm text-gray-500">
-                No transactions found for {getDateFilterLabel().toLowerCase()}
-              </div>
-            ) : (
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50">
-                  <tr className="text-[11px] uppercase tracking-wide text-gray-500">
-                    <th className="px-3 py-2 text-left font-medium">
-                      Date &amp; Time
-                    </th>
-                    <th className="px-3 py-2 text-left font-medium">Receipt</th>
-                    <th className="px-3 py-2 text-left font-medium">Items</th>
-                    <th className="px-3 py-2 text-left font-medium">Payment</th>
-                    <th className="px-3 py-2 text-right font-medium">
-                      Subtotal
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium">
-                      Discount
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium">Total</th>
-                    <th className="px-3 py-2 text-left font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
+          <div className="overflow-hidden border border-[var(--wk-line-strong)] bg-white shadow-[0_1px_0_rgb(16_23_42_/_0.02)]">
+            {/* Mobile Card View */}
+            <div className="block lg:hidden">
+              {loading && transactions.length === 0 ? (
+                <div className="px-4 py-12 text-center text-sm font-medium text-[var(--wk-muted)]">
+                  Loading transactions...
+                </div>
+              ) : transactions.length === 0 ? (
+                <div className="px-4 py-12 text-center text-sm font-medium text-[var(--wk-muted)]">
+                  No transactions found for {getDateFilterLabel().toLowerCase()}
+                </div>
+              ) : (
+                <div className="divide-y divide-[var(--wk-line)]">
                   {transactions.map((transaction) => {
                     const hasDiscount = (transaction.discount ?? 0) > 0;
                     return (
-                      <tr
+                      <div
                         key={transaction.id}
-                        className={`hover:bg-gray-50 ${hasDiscount ? "bg-orange-50/60" : ""}`}
+                        className={`px-4 py-3 ${hasDiscount ? "bg-[var(--wk-warning-soft)]/60" : ""}`}
                       >
-                        <td className="px-3 py-2 whitespace-nowrap text-gray-900">
-                          <div className="text-xs">
-                            {formatDate(transaction.timestamp)}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate text-xs font-bold text-[var(--wk-ink)]">
+                                {transaction.receiptNumber}
+                              </span>
+                              {transaction.status !== "completed" && (
+                                <StatusBadge status={transaction.status} />
+                              )}
+                            </div>
+                            <div className="mt-0.5 text-[11px] font-medium text-[var(--wk-muted)]">
+                              {formatDate(transaction.timestamp)}{" "}
+                              {formatTime(transaction.timestamp)} ·{" "}
+                              {getPaymentDisplay(transaction)}
+                            </div>
                           </div>
-                          <div className="text-[11px] text-gray-500">
-                            {formatTime(transaction.timestamp)}
+                          <div className="text-right shrink-0">
+                            <div className="text-sm font-black text-[var(--wk-success)] tabular-nums">
+                              {formatCurrency(
+                                transaction.total - (transaction.discount || 0),
+                              )}
+                            </div>
+                            {hasDiscount && (
+                              <div className="text-[10px] font-bold text-[var(--wk-warning)] tabular-nums">
+                                -{formatCurrency(transaction.discount!)}
+                              </div>
+                            )}
                           </div>
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
-                          {transaction.receiptNumber}
-                        </td>
-                        <td className="px-3 py-2 text-xs text-gray-500 max-w-xs truncate">
+                        </div>
+                        <div className="mt-2 truncate text-[11px] font-medium text-[var(--wk-muted)]">
                           {transaction.items
                             .slice(0, 3)
                             .map((i) => `${i.quantity}× ${i.productName}`)
                             .join(", ")}
                           {transaction.items.length > 3 &&
                             ` +${transaction.items.length - 3}`}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <span className="px-1.5 py-0.5 bg-gray-100 rounded text-[11px] text-gray-600">
-                            {getPaymentDisplay(transaction)}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-right whitespace-nowrap text-gray-900 tabular-nums">
-                          {formatCurrency(transaction.total)}
-                        </td>
-                        <td className="px-3 py-2 text-right whitespace-nowrap text-orange-600 tabular-nums">
-                          {hasDiscount
-                            ? `-${formatCurrency(transaction.discount!)}`
-                            : "–"}
-                        </td>
-                        <td className="px-3 py-2 text-right whitespace-nowrap font-semibold text-green-600 tabular-nums">
-                          {formatCurrency(
-                            transaction.total - (transaction.discount || 0),
-                          )}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <span
-                            className={`px-1.5 py-0.5 text-[10px] rounded-full ${
-                              transaction.status === "completed"
-                                ? "bg-green-100 text-green-700"
-                                : transaction.status === "cancelled"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-yellow-100 text-yellow-700"
-                            }`}
-                          >
-                            {transaction.status}
-                          </span>
-                        </td>
-                      </tr>
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            )}
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden lg:block overflow-x-auto">
+              {loading && transactions.length === 0 ? (
+                <div className="px-6 py-12 text-center text-sm font-medium text-[var(--wk-muted)]">
+                  Loading transactions...
+                </div>
+              ) : transactions.length === 0 ? (
+                <div className="px-6 py-12 text-center text-sm font-medium text-[var(--wk-muted)]">
+                  No transactions found for {getDateFilterLabel().toLowerCase()}
+                </div>
+              ) : (
+                <table className="min-w-full divide-y divide-[var(--wk-line)] text-sm">
+                  <thead className="bg-[var(--wk-canvas)]">
+                    <tr className="text-[11px] font-bold uppercase tracking-[0.07em] text-[var(--wk-muted)]">
+                      <th className="px-4 py-3 text-left font-bold">
+                        Date &amp; Time
+                      </th>
+                      <th className="px-4 py-3 text-left font-bold">Receipt</th>
+                      <th className="px-4 py-3 text-left font-bold">Items</th>
+                      <th className="px-4 py-3 text-left font-bold">Payment</th>
+                      <th className="px-4 py-3 text-right font-bold">
+                        Subtotal
+                      </th>
+                      <th className="px-4 py-3 text-right font-bold">
+                        Discount
+                      </th>
+                      <th className="px-4 py-3 text-right font-bold">Total</th>
+                      <th className="px-4 py-3 text-left font-bold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--wk-line)] bg-white">
+                    {transactions.map((transaction) => {
+                      const hasDiscount = (transaction.discount ?? 0) > 0;
+                      return (
+                        <tr
+                          key={transaction.id}
+                          className={`transition-colors hover:bg-[var(--wk-canvas)] ${hasDiscount ? "bg-[var(--wk-warning-soft)]/60" : ""}`}
+                        >
+                          <td className="whitespace-nowrap px-4 py-3 text-[var(--wk-ink)]">
+                            <div className="text-xs">
+                              {formatDate(transaction.timestamp)}
+                            </div>
+                            <div className="text-[11px] font-medium text-[var(--wk-muted)]">
+                              {formatTime(transaction.timestamp)}
+                            </div>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-xs font-bold text-[var(--wk-ink)]">
+                            {transaction.receiptNumber}
+                          </td>
+                          <td className="max-w-xs truncate px-4 py-3 text-xs font-medium text-[var(--wk-muted)]">
+                            {transaction.items
+                              .slice(0, 3)
+                              .map((i) => `${i.quantity}× ${i.productName}`)
+                              .join(", ")}
+                            {transaction.items.length > 3 &&
+                              ` +${transaction.items.length - 3}`}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <span className="rounded-md bg-[var(--wk-canvas)] px-2 py-1 text-[11px] font-bold text-[var(--wk-muted)]">
+                              {getPaymentDisplay(transaction)}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-[var(--wk-ink)] tabular-nums">
+                            {formatCurrency(transaction.total)}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-[var(--wk-warning)] tabular-nums">
+                            {hasDiscount
+                              ? `-${formatCurrency(transaction.discount!)}`
+                              : "–"}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-right font-bold text-[var(--wk-success)] tabular-nums">
+                            {formatCurrency(
+                              transaction.total - (transaction.discount || 0),
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <StatusBadge status={transaction.status} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
-        </div>
+        </section>
       </main>
     </div>
   );

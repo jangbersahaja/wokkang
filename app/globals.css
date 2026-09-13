@@ -1,14 +1,51 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --wk-canvas: #f6f7fb;
+  --wk-surface: #ffffff;
+  --wk-ink: #10172a;
+  --wk-muted: #5b6478;
+  --wk-faint: #8b94a7;
+  --wk-line: #e3e6ee;
+  --wk-line-strong: #cbd1df;
+  --wk-brand: #635bff;
+  --wk-cyan: #0ebed4;
+  --wk-success: #16876d;
+  --wk-success-soft: #e7f5f0;
+  --wk-warning: #d97810;
+  --wk-warning-soft: #fff1df;
+  --wk-danger: #c43d56;
+  --wk-danger-soft: #fce8ed;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--wk-ink);
+  background-color: var(--wk-canvas);
+  background-image:
+    linear-gradient(rgb(16 23 42 / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(16 23 42 / 0.025) 1px, transparent 1px);
+  background-size: 28px 28px;
+  font-family: "Avenir Next", Avenir, "Helvetica Neue", sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+::selection {
+  background: rgb(99 91 255 / 0.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @layer utilities {

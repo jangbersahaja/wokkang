@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "StoreHub Transaction Monitor",
-  description: "Real-time transaction monitoring for StoreHub",
+  title: "Wokkang | StoreHub Sales Pulse",
+  description: "Live StoreHub sales and transaction monitoring for Wokkang.",
 };
 
 export default function RootLayout({
