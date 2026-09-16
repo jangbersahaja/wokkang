@@ -1,8 +1,9 @@
 "use client";
 
 import { logout } from "@/app/actions/auth";
-import { RefreshCw, Wifi } from "lucide-react";
+import { Menu, RefreshCw, Wifi, X } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { WokkangMark } from "./WokkangMark";
 
 type ConnectionStatus = "checking" | "connected" | "disconnected";
@@ -32,6 +33,7 @@ export function AppHeader({
   username,
   canManageAccounts,
 }: AppHeaderProps) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const showRefreshControls = Boolean(onRefresh && onToggleAutoRefresh);
 
   const connectionLabel =
@@ -141,8 +143,53 @@ export function AppHeader({
               </form>
             </div>
           )}
+          {username && (
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen((isOpen) => !isOpen)}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-account-menu"
+              aria-label="Open account menu"
+              className="grid h-8 w-8 place-items-center rounded-md border border-[var(--wk-line-strong)] text-[var(--wk-ink)] sm:hidden"
+            >
+              {isMobileMenuOpen ? (
+                <X className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <Menu className="h-4 w-4" aria-hidden="true" />
+              )}
+            </button>
+          )}
         </div>
       </div>
+      {username && isMobileMenuOpen && (
+        <div
+          id="mobile-account-menu"
+          className="border-t border-[var(--wk-line)] bg-white px-4 py-3 sm:hidden"
+        >
+          <div className="mx-auto flex max-w-7xl items-center gap-3">
+            <span className="mr-auto text-sm font-medium text-[var(--wk-muted)]">
+              {username}
+            </span>
+            {canManageAccounts && (
+              <Link
+                href="/admin/accounts"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="rounded-md bg-[var(--wk-ink)] px-3 py-1.5 text-xs font-bold text-white"
+              >
+                Accounts
+              </Link>
+            )}
+            <form action={logout}>
+              <button
+                type="submit"
+                className="rounded-md px-3 py-1.5 text-xs font-bold text-[var(--wk-danger)]"
+              >
+                Logout
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
