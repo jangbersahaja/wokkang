@@ -1,3 +1,4 @@
+import { AppHeader } from "@/components/dashboard/AppHeader";
 import { requireRole } from "@/lib/auth/dal";
 import { listRegistrationTokens, listUsers } from "@/lib/auth/users";
 import AccountsManagementClient from "./AccountsManagementClient";
@@ -13,6 +14,7 @@ export default async function AccountsManagementPage() {
 
   return (
     <div className="min-h-screen w-full bg-[var(--wk-canvas)]">
+      <AppHeader username={session.username} canManageAccounts />
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="mb-2 text-3xl font-black text-[var(--wk-ink)]">

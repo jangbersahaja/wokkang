@@ -126,11 +126,6 @@ export default function LiveMonitorPage() {
     loadSession();
   }, []);
 
-  const handleLogout = useCallback(async () => {
-    await fetch("/api/logout", { method: "POST" });
-    window.location.href = "/login";
-  }, []);
-
   // Get date range based on filter (Malaysia timezone)
   const getDateRange = () => {
     // Get current time in Malaysia timezone (UTC+8)
@@ -504,7 +499,6 @@ export default function LiveMonitorPage() {
         canManageAccounts={
           session?.role === "SUPER_ADMIN" || session?.role === "ADMIN"
         }
-        onLogout={handleLogout}
       />
 
       <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
