@@ -1,7 +1,16 @@
+import { getSession } from "@/lib/auth/session";
 import { getTransactions } from "@/lib/storehubApi";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 },
+    );
+  }
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const startDate = searchParams.get("startDate") || undefined;

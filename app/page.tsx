@@ -95,6 +95,10 @@ export default function LiveMonitorPage() {
   const [dateFilter, setDateFilter] = useState<DateFilter>("today");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [session, setSession] = useState<{
+    username: string;
+    role: string;
+  } | null>(null);
 
   // Test connection on mount
   useEffect(() => {
@@ -109,6 +113,22 @@ export default function LiveMonitorPage() {
       }
     }
     checkConnection();
+
+    async function loadSession() {
+      try {
+        const response = await fetch("/api/session");
+        const data = await response.json();
+        setSession(data.session);
+      } catch {
+        setSession(null);
+      }
+    }
+    loadSession();
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "/login";
   }, []);
 
   // Get date range based on filter (Malaysia timezone)
@@ -480,6 +500,11 @@ export default function LiveMonitorPage() {
         lastUpdated={isMounted ? stats.lastUpdated : ""}
         onRefresh={fetchTransactions}
         onToggleAutoRefresh={() => setAutoRefresh(!autoRefresh)}
+        username={session?.username}
+        canManageAccounts={
+          session?.role === "SUPER_ADMIN" || session?.role === "ADMIN"
+        }
+        onLogout={handleLogout}
       />
 
       <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 lg:py-10">

@@ -1,0 +1,185 @@
+import "server-only";
+
+import { sql } from "@/lib/db";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import type { Role } from "./roles";
+
+export type User = {
+  id: number;
+  username: string;
+  email: string;
+  password_hash: string;
+  role: Role;
+  created_at: string;
+};
+
+export async function getUserByIdentifier(
+  identifier: string,
+): Promise<User | null> {
+  const rows = await sql`
+    SELECT id, username, email, password_hash, role, created_at
+    FROM users
+    WHERE lower(username) = lower(${identifier}) OR lower(email) = lower(${identifier})
+    LIMIT 1
+  `;
+  return (rows[0] as User) || null;
+}
+
+export async function getUserById(id: number): Promise<User | null> {
+  const rows = await sql`
+    SELECT id, username, email, password_hash, role, created_at
+    FROM users
+    WHERE id = ${id}
+    LIMIT 1
+  `;
+  return (rows[0] as User) || null;
+}
+
+export async function verifyPassword(
+  plainPassword: string,
+  passwordHash: string,
+): Promise<boolean> {
+  return bcrypt.compare(plainPassword, passwordHash);
+}
+
+export async function hashPassword(plainPassword: string): Promise<string> {
+  return bcrypt.hash(plainPassword, 10);
+}
+
+export async function createUser(input: {
+  username: string;
+  email: string;
+  password: string;
+  role: Role;
+}): Promise<User> {
+  const passwordHash = await hashPassword(input.password);
+  const rows = await sql`
+    INSERT INTO users (username, email, password_hash, role)
+    VALUES (${input.username}, ${input.email}, ${passwordHash}, ${input.role})
+    RETURNING id, username, email, password_hash, role, created_at
+  `;
+  return rows[0] as User;
+}
+
+export async function usernameOrEmailExists(
+  username: string,
+  email: string,
+): Promise<boolean> {
+  const rows = await sql`
+    SELECT id FROM users
+    WHERE lower(username) = lower(${username}) OR lower(email) = lower(${email})
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+export async function listUsers(): Promise<User[]> {
+  const rows = await sql`
+    SELECT id, username, email, password_hash, role, created_at
+    FROM users
+    ORDER BY created_at DESC
+  `;
+  return rows as User[];
+}
+
+/**
+ * Deletes a user account. Any registration tokens the user created or
+ * consumed are detached (set to NULL) rather than cascading, preserving
+ * the audit trail of link creation/usage.
+ */
+export async function deleteUser(id: number): Promise<boolean> {
+  await sql`
+    UPDATE registration_tokens SET created_by = NULL WHERE created_by = ${id}
+  `;
+  await sql`
+    UPDATE registration_tokens SET used_by = NULL WHERE used_by = ${id}
+  `;
+  const rows = await sql`
+    DELETE FROM users WHERE id = ${id} RETURNING id
+  `;
+  return rows.length > 0;
+}
+
+/* -------------------------------------------------------------------- */
+/* Registration tokens (single-use invite links)                        */
+/* -------------------------------------------------------------------- */
+
+export type RegistrationToken = {
+  id: number;
+  token: string;
+  role: Role;
+  created_by: number | null;
+  created_at: string;
+  used_at: string | null;
+  used_by: number | null;
+};
+
+export function generateTokenString(): string {
+  return crypto.randomBytes(24).toString("hex");
+}
+
+export async function createRegistrationToken(
+  role: Role,
+  createdBy: number,
+): Promise<RegistrationToken> {
+  const token = generateTokenString();
+  const rows = await sql`
+    INSERT INTO registration_tokens (token, role, created_by)
+    VALUES (${token}, ${role}, ${createdBy})
+    RETURNING id, token, role, created_by, created_at, used_at, used_by
+  `;
+  return rows[0] as RegistrationToken;
+}
+
+export async function getRegistrationToken(
+  token: string,
+): Promise<RegistrationToken | null> {
+  const rows = await sql`
+    SELECT id, token, role, created_by, created_at, used_at, used_by
+    FROM registration_tokens
+    WHERE token = ${token}
+    LIMIT 1
+  `;
+  return (rows[0] as RegistrationToken) || null;
+}
+
+export async function listRegistrationTokens(): Promise<RegistrationToken[]> {
+  const rows = await sql`
+    SELECT id, token, role, created_by, created_at, used_at, used_by
+    FROM registration_tokens
+    ORDER BY created_at DESC
+    LIMIT 50
+  `;
+  return rows as RegistrationToken[];
+}
+
+/**
+ * Atomically marks a token as used. The `used_at IS NULL` guard makes this
+ * safe against races, so a token can never be consumed more than once.
+ */
+export async function consumeRegistrationToken(
+  token: string,
+  usedBy: number,
+): Promise<boolean> {
+  const rows = await sql`
+    UPDATE registration_tokens
+    SET used_at = now(), used_by = ${usedBy}
+    WHERE token = ${token} AND used_at IS NULL
+    RETURNING id
+  `;
+  return rows.length > 0;
+}
+
+/**
+ * Deletes an *unused* registration link. Used links are kept as an audit
+ * trail and cannot be removed this way.
+ */
+export async function deleteRegistrationToken(id: number): Promise<boolean> {
+  const rows = await sql`
+    DELETE FROM registration_tokens
+    WHERE id = ${id} AND used_at IS NULL
+    RETURNING id
+  `;
+  return rows.length > 0;
+}

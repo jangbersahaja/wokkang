@@ -1,4 +1,5 @@
 import { RefreshCw, Wifi } from "lucide-react";
+import Link from "next/link";
 import { WokkangMark } from "./WokkangMark";
 
 type ConnectionStatus = "checking" | "connected" | "disconnected";
@@ -10,6 +11,9 @@ type AppHeaderProps = {
   lastUpdated: string;
   onRefresh: () => void;
   onToggleAutoRefresh: () => void;
+  username?: string;
+  canManageAccounts?: boolean;
+  onLogout?: () => void;
 };
 
 const navigationItems = ["Dashboard", "Transactions", "Products", "Settings"];
@@ -21,6 +25,9 @@ export function AppHeader({
   lastUpdated,
   onRefresh,
   onToggleAutoRefresh,
+  username,
+  canManageAccounts,
+  onLogout,
 }: AppHeaderProps) {
   const connectionLabel =
     connectionStatus === "connected"
@@ -100,6 +107,28 @@ export function AppHeader({
               aria-hidden="true"
             />
           </button>
+          {username && (
+            <div className="hidden items-center gap-2 border-l border-[var(--wk-line)] pl-2 sm:flex">
+              {canManageAccounts && (
+                <Link
+                  href="/admin/accounts"
+                  className="rounded-md px-2.5 py-1.5 text-xs font-bold text-[var(--wk-muted)] hover:text-[var(--wk-ink)]"
+                >
+                  Accounts
+                </Link>
+              )}
+              <span className="text-xs font-medium text-[var(--wk-muted)]">
+                {username}
+              </span>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="rounded-md px-2.5 py-1.5 text-xs font-bold text-[var(--wk-muted)] hover:text-[var(--wk-danger)]"
+              >
+                Logout
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
